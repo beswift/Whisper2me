@@ -89,7 +89,7 @@ def get_current_weather():
     base_url = "http://api.openweathermap.org/data/2.5/weather?"
     myip = get_ip()
     city_name = location(myip)['city']
-    complete_url = base_url + "appid=" + api_key + "&q=" + city_name
+    complete_url = base_url + "appid=" + api_key + "&q=" + city_name + "&units=fahrenheit"
     response = requests.get(complete_url)
     x = response.json()
     if x["cod"] != "404":
@@ -114,7 +114,7 @@ def speak(text, filename='_'):
                 os.makedirs(folder)
             filepath = os.path.join(folder, filename)
             tts.save(filepath)
-            playsound.playsound(filename)
+            playsound.playsound(filepath)
         else:
 
             print('No text to speak')
@@ -173,6 +173,25 @@ def respond_with_google(text):
     print(tokenizer.decode(outputs[0]))
     return tokenizer.decode(outputs[0])
 
+def play_a_song(prompt):
+    import torch
+    from diffusers import StableDiffusionPipeline
+    from audio import wav_bytes_from_spectrogram_image
+    import playsound
+    pipe = StableDiffusionPipeline.from_pretrained("riffusion/riffusion-model-v1", torch_dtype=torch.float16).to("cuda")
+    with torch.autocast("cuda"):
+        image = pipe(prompt, height=512, width=512).images[0];
+    wav = wav_bytes_from_spectrogram_image(image)
+    filename = prompt.replace(" ", "_") + ".wav"
+    filedir = os.path.join('logs','music')
+    filepath = os.path.join(filedir, filename)
+    if not os.path.exists(filedir):
+        os.makedirs(filedir)
+    with open(filepath, "wb") as f:
+        f.write(wav[0].getbuffer())
+    playsound.playsound(filepath)
+    return filepath
+
 
 @click.command()
 @click.option("--model", default="base", help="Model to use",
@@ -181,7 +200,7 @@ def respond_with_google(text):
 @click.option("--verbose", default=False, help="Whether to print verbose output", is_flag=True, type=bool)
 @click.option("--energy", default=300, help="Energy level for mic to detect", type=int)
 @click.option("--dynamic_energy", default=False, is_flag=True, help="Flag to enable dynamic energy", type=bool)
-@click.option("--pause", default=0.8, help="Pause time before entry ends", type=float)
+@click.option("--pause", default=1.5, help="Pause time before entry ends", type=float)
 @click.option("--save_file", default=False, help="Flag to save file", is_flag=True, type=bool)
 
 def main(model, english, verbose, energy, pause, dynamic_energy, save_file):
@@ -247,80 +266,100 @@ def main(model, english, verbose, energy, pause, dynamic_energy, save_file):
                 predicted_text = result["text"]
                 print("You said: " + predicted_text)
                 said = predicted_text
-                if len(said.split()) >1:
-                    if 'stop' and 'recording' in said:
+                start_keyword = 'record'
+                if len(said)>2:
+                    if 'stop recording' in said:
                         print('stop triggered')
                         exit()
                         #sys.exit()
                         break
-                    if 'time' in said:
-                        print('time triggered')
-                        filename_it += 1
-                        speak(f'The time is, {time.ctime()}')
-                    if 'date' in said:
-                        print('date triggered')
-                        filename_it += 1
-                        speak(f'Todays date is, {datetime.now().strftime("%d-%m-%Y")}')
-                    if 'weather' in said:
-                        print('weather triggered')
-                        filename_it += 1
-                        current_weather = get_current_weather()
-                        speak(f'The weather is, {current_weather}')
-                    if 'generate images of' in said:
-                        print('image generation triggered')
-                        speak(f'Generating 4 images of {said[24:]}')
-                        generate_images(said[24:])
-                        speak(f'Youre image of  {said[24:]}, have been generated')
-                    if 'generate' and 'images' in said:
-                        print('image generation with number triggered')
-                        #find the number which should be between generate and images, split between "generate" and "images"
-                        num = said.rsplit("generate")
-                        if num is not int:
-                            num = 4
-                        pre = len(said.split("images")[0])
-                        speak(f'Generating {num} images of {said[pre:]}')
-                        generate_images(said[pre:], num)
-                        speak(f'Youre {said[pre:]}, have been generated')
-                    if 'help' and 'code' in said:
-                        print('help code triggered')
-                        pre = len(said.split("code")[0])
-                        speak(f'Sure, I can help you with generating code for {said[pre:]}')
-                        result = get_code_completion(said[pre:])
-                        speak(f'Here is some code for {said[pre:]}')
-                        print(result)
-                    if 'what' and 'help' in said:
-                        print('help triggered')
-                        speak(f'You can ask me to generate images, generate code, tell you the time, date, weather, or stop recording')
-                    if 'gpt whats' or 'gpt what is' in said:
-                        print('gpt triggered')
-                        text = said
-                        response = get_text_completion(text)
-                        print(response)
-                        speak(response)
-                    if 'Eve' or 'Jarvis' in said:
-                        print('hey g triggered')
-                        response = respond_with_google(said)
-                        print(response)
-                    else:
-                        try:
-                            print('gpt triggered as after thought')
+                    if start_keyword in said.lower():
+                        print('start triggered')
+                        said = said.replace(start_keyword, '')
+                        said = str.strip(said)
+
+                        if 'time' in said:
+                            print('time triggered')
+                            filename_it += 1
+                            speak(f'The time is, {time.ctime()}')
+                        if 'date' in said:
+                            print('date triggered')
+                            filename_it += 1
+                            speak(f'Todays date is, {datetime.now().strftime("%d-%m-%Y")}')
+                        if 'weather' in said:
+                            print('weather triggered')
+                            filename_it += 1
+                            current_weather = get_current_weather()
+                            speak(f' {current_weather}')
+                        if 'generate images of' in said:
+                            print('image generation triggered')
+                            speak(f'Generating 4 images of {said[24:]}')
+                            generate_images(said[24:])
+                            speak(f'Youre image of  {said[24:]}, have been generated')
+                        if 'generate' and 'images' in said:
+                            print('image generation with number triggered')
+                            #find the number which should be between generate and images, split between "generate" and "images"
+                            num = said.rsplit("generate")
+                            if num is not int:
+                                num = 4
+                            pre = len(said.split("images")[0])
+                            speak(f'Generating {num} images of {said[pre:]}')
+                            generate_images(said[pre:], num)
+                            speak(f'Youre {said[pre:]}, have been generated')
+                        if 'help' and 'code' in said:
+                            print('help code triggered')
+                            pre = len(said.split("code")[0])
+                            speak(f'Sure, I can help you with generating code for {said[pre:]}')
+                            result = get_code_completion(said[pre:])
+                            speak(f'Here is some code for {said[pre:]}')
+                            print(result)
+                        if 'what' and 'help' in said:
+                            print('help triggered')
+                            speak(f'You can ask me to generate images, generate code, tell you the time, date, weather, or stop recording')
+                        if 'gpt' in said:
+                            print('gpt triggered')
                             text = said
-                            more = input('Do you want to add more text?')
-                            if more == 'yes':
-                                response = get_text_completion(text)
-                                speak(response)
-                            else:
-                                speak('Ok')
-                                more = input('Do you want to add more text with google?')
-                                if more == 'yes':
-                                    response = respond_with_google(text)
-                                    print(response)
-                        except:
-                            print('gpt failed')
-                            print('local google model triggered')
-                            text = said
-                            response = respond_with_google(text)
+                            response = get_text_completion(text)
+                            print(response)
                             speak(response)
+                        if 'google' in said:
+                            print('hey g triggered')
+                            said = said.replace('google', '')
+                            response = respond_with_google(said)
+                            print(response)
+                        if 'make a song' or 'play a song' in said:
+                            print('song triggered')
+                            said = said.replace('make a song ', '')
+                            said = said.replace('play a song ', '')
+                            said = said.replace('with ', '')
+                            said = str.strip(said)
+                            response = play_a_song(said)
+                            print(response)
+                        else:
+                            try:
+                                print('gpt triggered as after thought')
+                                text = said
+                                more = input('Do you want to add more text?')
+                                if more == 'yes':
+                                    response = get_text_completion(text)
+                                    speak(response)
+                                else:
+                                    speak('Ok')
+                                    more = input('Do you want to add more text with google?')
+                                    if more == 'yes':
+                                        response = respond_with_google(text)
+                                        print(response)
+                            except:
+                                print('gpt failed')
+                                print('local google model triggered')
+                                text = said
+                                response = respond_with_google(text)
+
+                                speak(response)
+
+                    else:
+                        print('no start keyword')
+
                 else:
                     print("You said nothing")
             else:
