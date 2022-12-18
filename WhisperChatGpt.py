@@ -85,20 +85,18 @@ if 'how are you' in said:
     speak("I am fine, thank you. how can I help you?")
 else:
 
+    try:
+        chatbot = Chatbot({
 
+        })
+        response = chatbot.get_chat_response(said)
+        print(response)
+        response_message = response['message']
+        print(response_message)
+        speak(response_message,filename='response')
 
-try:
-    chatbot = Chatbot({
-
-    })
-    response = chatbot.get_chat_response(said)
-    print(response)
-    response_message = response['message']
-    print(response_message)
-    speak(response_message,filename='response')
-
-except:
-    traceback.print_exc()
-    print('error')
-    speak('error',filename='error')
+    except:
+        traceback.print_exc()
+        print('error')
+        speak('error',filename='error')
 
