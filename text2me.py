@@ -109,14 +109,13 @@ def speak(text, filename='_'):
             timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
             tts = gTTS(text=text, lang='en', tld='co.uk')
             filename = f'voice_mimic_{filename}-{timestamp}.mp3'
-            folder = os.path.join('logs','voice')
+            folder = os.path.join('logs','voice','responses')
             if not os.path.exists(folder):
                 os.makedirs(folder)
             filepath = os.path.join(folder, filename)
             tts.save(filepath)
             playsound.playsound(filepath,block=False)
         else:
-
             print('No text to speak')
     except Exception as e:
         print(e)
@@ -143,14 +142,31 @@ def get_code_completion(prompt):
     response = openai.Completion.create(
         engine="code-davinci-002",
         prompt=prompt,
-        temperature=0.5,
-        max_tokens=500,
+        temperature=0.1,
+        max_tokens=1000,
         top_p=1,
         frequency_penalty=0.5,
         presence_penalty=0.6,
         #stop=["\n", " Human:", " AI:"]
     )
-    return response.choices[0].text
+
+    filename = f'code_completion_{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}.txt'
+    filename_txt = f'code_prompt_{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}.txt'
+    folder = os.path.join('logs','code')
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+    filepath = os.path.join(folder, filename)
+    filepath_txt = os.path.join(folder, filename_txt)
+    with open(filepath, 'w') as f:
+        text = response.choices[0].text
+        print(text)
+        f.write(str(text))
+    with open(filepath_txt, 'w') as f:
+        f.write(prompt)
+    print(f'Code completion saved to {filepath}')
+    print(f'Code prompt saved to {filepath_txt}')
+    print(response.choices[0].text)
+    return response.choices[0].text, filepath, filepath_txt
 
 
 def generate_Dalle_images(text, n=4):
@@ -249,9 +265,9 @@ def play_a_song(prompt):
     import numpy as np
     from scipy.io.wavfile import read
 
-    from riffusion_test.riffusion.riffusion_pipeline import RiffusionPipeline
-    from riffusion_test.riffusion.datatypes import PromptInput, InferenceInput
-    from riffusion_test.riffusion.audio import wav_bytes_from_spectrogram_image
+    from riffusion.riffusion.riffusion_pipeline import RiffusionPipeline
+    from riffusion.riffusion.datatypes import PromptInput, InferenceInput
+    from riffusion.riffusion.audio import wav_bytes_from_spectrogram_image
     from PIL import Image
     import struct
     import random
@@ -341,11 +357,6 @@ def generate_a_song(prompt_1,prompt_2='',steps=25, num_iterations=2, feel='og_be
         return mask
 
     def i2i(prompt, steps, feel, seed):
-        #   return pipe_i2i(
-        #       prompt,
-        #       num_inference_steps=steps,
-        #       image=Image.open(f"riffusion/seed_images/{feel}.png").convert("RGB"),
-        #       ).images[0]
 
         prompt_input_start = PromptInput(prompt=prompt, seed=seed)
         prompt_input_end = PromptInput(prompt=prompt, seed=seed)
@@ -483,6 +494,7 @@ def generate_a_song(prompt_1,prompt_2='',steps=25, num_iterations=2, feel='og_be
             prompt_end (str, optional): Prompt to end with. Defaults to prompt_start.
             overlap (float, optional): Overlap between audio clips as a fraction of the image size. Defaults to 0.2.
             """
+        prompt_start = prompt_start.strip().strip('"').strip("'").strip("\n")
 
         # open the initial image and convert it to RGB
         try:
@@ -496,6 +508,8 @@ def generate_a_song(prompt_1,prompt_2='',steps=25, num_iterations=2, feel='og_be
             seed_start = random.randint(0, 4294967295)
         if seed_end is None:
             seed_end = seed_start
+
+        prompt_end = prompt_end.strip().strip('"').strip("'").strip("\n")
 
         # one riffuse() generates 5 seconds of audio
         wav_list = []
@@ -512,16 +526,27 @@ def generate_a_song(prompt_1,prompt_2='',steps=25, num_iterations=2, feel='og_be
             seed_start = seed_end
             seed_end = seed_start + 1
 
+            filename = "bg_image"+str(i)+'_'+prompt_start.replace(" ", "_")[:20] + str(int(time.time())) + ".png"
+            filedir = os.path.join('logs','music','bg_image')
+            if not os.path.exists(filedir):
+                os.makedirs(filedir)
+            filepath = os.path.join(filedir, filename)
+            init_image.save(filepath)
 
-        filename = "bg_image"+prompt_start.replace(" ", "_")[:20] + str(int(time.time())) + ".png"
-        filedir = os.path.join('logs','music','bg_image')
-        if not os.path.exists(filedir):
-            os.makedirs(filedir)
-        filepath = os.path.join(filedir, filename)
-        init_image.save(filepath)
+            filename = "music_part"+str(i)+'_'+prompt_start.replace(" ", "_")[:20] + str(int(time.time())) + ".wav"
+            filedir = os.path.join('logs','music')
+            if not os.path.exists(filedir):
+                os.makedirs(filedir)
+            filepath = os.path.join(filedir, filename)
+            #with open(filepath, "wb") as f:
+                #f.write(wav_bytes.read())
+                #wav_bytes.close()
+            print(wav_list)
 
-        filename = "music_"+prompt_start.replace(" ", "_")[:20] + str(int(time.time())) + ".wav"
-        filename_txt = "music_"+prompt_start.replace(" ", "_")[:20] + str(int(time.time())) + ".txt"
+            #playsound.playsound(filepath, block=False)
+
+        filename = "music_"+prompt_start.replace(" ", "")[:20] + str(int(time.time())) + ".wav"
+        filename_txt = "music_"+prompt_start.replace(" ", "")[:20] + str(int(time.time())) + ".txt"
         filedir = os.path.join('logs','music')
         if not os.path.exists(filedir):
             os.makedirs(filedir)
@@ -547,168 +572,306 @@ def generate_a_song(prompt_1,prompt_2='',steps=25, num_iterations=2, feel='og_be
 def split_text(text, n=4000):
     return [text[i:i+n] for i in range(0, len(text), n)]
 
-def parse_said(text):
-    text = text.lower()
-    text =str.strip(text)
-
-    if 'weather' in text:
-        return get_current_weather()
-    elif 'song' in text:
-        text = text.lower()
-        text = text.replace('play a song', '').replace('make a song', '')
-        return play_a_song(text)
-    elif 'image' in text:
-        return generate_Dalle_images(text)
-    elif 'code' in text:
-        return get_code_completion(text)
-    elif 'text' in text:
-        return get_text_completion(text)
-    elif 'google' in text:
-        return respond_with_google(text)
-    else:
-        return 'I do not know how to do that yet'
 
 
+def gpt_get_jam_prompt(temp=0.9,top_p=1.0,freq=0,pres=0.0):
+    print("Requesting prompt from GPT-3")
+    request = '''write a prompt for a song in the form: "prompt1-prompt2-steps-num_inf-style-seed", where:
+        "-" is a separator and the args are separated by it the args should not contain the separator
+        prompt1 is a string describing the instruments and feeling at the start of a song, 
+        prompt2 is a string describing the instruments and feeling at the end of a song,
+        steps is an int between 25 and 60 and is the number of steps to generate, 
+        num_inf is an int between 2 and 10 and is the number of instruments to generate, 
+        style is a string from the list of options ['vibes',og_beat,'motorway',marim,'agile','add','boom','shine'] and is the style to use, 
+        seed is an int between 0 and 99999 however in most cases 0 should be used just to generate a random seed
+
+        prompt1 and prompt2 should be fun and creative
+        '''
+    response = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=request,
+        temperature=temp,
+        max_tokens=1000,
+        top_p=top_p,
+        frequency_penalty=freq,
+        presence_penalty=pres,
+        #stop=["\n"]
+    )
+    print(f'Got prompt from GPT-3: {response["choices"][0]["text"]}')
+    return response.choices[0].text
+
+
+
+def gpt_jam():
+    print("GPT-Jam is ready to jam")
+    while True:
+        request = '''write a set of prompts for a song in the form 
+        "prompt1,prompt2,steps,num_inf,style,seed" 
+        where prompt1 is a string describing the instruments and feeling at the start of a song, 
+        prompt2 is a string describing the instruments and feeling at the end of a song,
+        steps is an int between 25 and 60 and is the number of steps to generate, 
+        num_inf is an int between 2 and 10 and is the number of instruments to generate, 
+        style is a string from the list of options ['vibes',og_beat,'motorway',marim,'agile'] and is the style to use, 
+        seed is an int between 0 and 99999 however in most cases 0 should be used just to generate a random seed
+        
+        prompt1 and prompt2 should be fun and creative similar but different to the examples below:
+        "bright and melodic piano with soft strings and a light jazz beat", "dark and moody piano with heavy strings and a heavy metal beat"
+        "dark and moody piano with heavy strings and a heavy metal beat", "acoustic folk ballad with an oboe and a hip hop hook"
+        "acoustic folk ballad with an oboe and a hip hop hook","sunset on the beach with a ukulele and a reggae beat"
+        "horn-powered geek rock","Irish Drinking songs cranked to 11 With a horn section"
+        "a melodic piano solo to make love to", "bump and grind hip hop with a saxophone"
+       
+        '''
+
+
+
+def parse_said(said):
+    said = said.lower()
+    said =said.strip()
+    if 'get time' in said:
+        print('time triggered')
+        speak(f'The time is, {time.ctime()}')
+        # convert time to epoch time
+        epoch_time = int(time.time())
+        print(epoch_time)
+        said = 'none'
+        prompt = 'none'
+
+    if 'date' in said:
+        print('date triggered')
+        speak(f'Todays date is, {datetime.now().strftime("%d-%m-%Y")}')
+        print(datetime.now().strftime("%d-%m-%Y"))
+
+
+    if 'weather' in said:
+        print('weather triggered')
+        current_weather = get_current_weather()
+        speak(f' {current_weather}')
+
+
+    if 'generate images of' in said:
+        print('image generation triggered')
+        speak(f'Generating 4 images of {said[18:]}')
+        generate_Dalle_images(said[18:])
+        speak(f'Youre images of  {said[18:]}, have been generated')
+
+    if 'generate' and 'images' in said:
+        print('image generation with number triggered')
+        # find the number which should be between generate and images, split between "generate" and "images"
+        num = said.lsplit("generate")[1].rsplit("images")[0]
+        if num is not int:
+            num = 4
+        pre = len(said.split("images")[0])
+        speak(f'Generating {num} images of {said[pre:]}')
+        generate_Dalle_images(said[pre:], num)
+        speak(f'Youre {said[pre:]}, have been generated')
+
+    if 'stable diffuse' in said:
+        print('stable diffusion triggered')
+        speak(f'Generating 4 images of {said[15:]}')
+        generate_SD_images(said[15:])
+        speak(f'Youre images of  {said[15:]}, have been generated')
+
+    if 'help' and 'code' in said:
+        print('help code triggered')
+        pre = len(said.split("code")[0])
+        speak(f'Sure, I can help you with generating code for {said[pre:]}')
+        result = get_code_completion(said[pre:])[0]
+        speak(f'Here is some code for {said[pre:]}')
+        print(result)
+
+
+
+    if 'gpt' in said:
+        print('gpt triggered')
+        text = said
+        response = get_text_completion(text)
+        print(response)
+        speak(response)
+
+
+    if 'google' in said:
+        print('hey g triggered')
+        said = said.replace('google', '')
+        response = respond_with_google(said)
+        print(response)
+
+
+    if 'make a clip' in said or 'generate a clip' in said:
+        print('clip triggered')
+        said = said.replace('make a clip ', '')
+        said = said.replace('play a clip ', '')
+        said = said.replace('with ', '')
+        said = str.strip(said)
+        response = play_a_song(said)
+
+
+    if 'make a song' in said or 'play a song' in said:
+        print('song triggered')
+        prompt = input('prompt_1,prompt_2="",steps=25, num_iterations=2, feel="og_beat",seed=0')
+        args = prompt.split(',')
+        prompt_1 = args[0].strip('"')
+        prompt_2 = args[1].strip('"')
+        steps = int(args[2])
+        num_iterations = int(args[3])
+        feel = args[4].strip("'")
+        seed = int(args[5])
+        response = generate_a_song(prompt_1, prompt_2, steps, num_iterations, feel, seed)
+        print(response)
+
+
+    if 'jam prompt' in said:
+        print('jam prompt triggered')
+        jam_prompt = gpt_get_jam_prompt()
+        print(jam_prompt)
+        jam = input('jam?')
+        if jam == 'yes' or jam == 'y' or jam == 'yeah' or jam == 'sure' or jam == 'ok'or jam == '':
+            jam_prompt.strip('"')
+            args = jam_prompt.split('-')
+            prompt_1 = args[0].strip('"')
+            prompt_2 = args[1].strip('"')
+            steps = args[2]
+            if steps is not int:
+                steps = 30
+            steps = int(steps)
+            num_iterations = (args[3])
+            if num_iterations is not int:
+                num_iterations = 2
+            num_iterations = int(num_iterations)
+            feel = args[4].strip("'")
+            seed = (args[5]).strip('"')
+            seed = int(seed)
+            response = generate_a_song(prompt_1, prompt_2, steps, num_iterations, feel, seed)
+            print(response)
+        elif jam == 'no':
+            print('ok')
+
+    if 'make a jam' in said or 'jam out' in said:
+        print('jam triggered')
+        gpt_jam()
+
+
+    if 'help me' in said:
+        print('help triggered')
+        speak(f'You can ask me to generate images, generate code, tell you the time, date, weather, or stop recording')
+        speak(f'do you want to know more?')
+        more = input('do you want to know more?')
+        if 'yes' in more:
+            print('more help triggered')
+            print('''
+            cmd: generate images of <object>
+            cmd: generate <number> images of <object>
+            cmd: stable diffuse <object>
+            cmd: help code <object>
+            cmd: help me
+            cmd: get time
+            cmd: date
+            cmd: weather
+            cmd: stop recording (and exit)
+            cmd: gpt <text>
+            cmd: google <text>
+            cmd: make a clip <text>
+            cmd: make a song <text>
+            cmd: jam prompt
+            cmd: make a jam
+            cmd: jam out
+            ''')
+            speak('to know more about a cmd, type help <cmd>')
+    if 'help generate images of' in said:
+        print('help generate images of triggered')
+        speak(f'generate images of <object> will generate 4 images of <object>,this will cost you money and you need an api key')
+        speak(f'for example, generate images of a cat' or 'generate images of a dog')
+    if 'help generate <number> images of' in said:
+        print('help generate <number> images of triggered')
+        speak(f'generate <number> images of <object> will generate <number> images of <object>,this will cost you money and you need an api key')
+        speak(f'for example, generate 3 images of a cat' or 'generate 2 images of a dog')
+    if 'help stable diffuse' in said:
+        print('help stable diffuse triggered')
+        speak(f'stable diffuse <object> will generate 4 images of <object> using stable diffusion - which is free, you should use this option!')
+        speak(f'for example, stable diffuse a cat' or 'stable diffuse a dog')
+    if 'help help code' in said:
+        print('help help code triggered')
+        speak(f'help code <object> will generate code for <object>, using openai codex, you need an api key')
+        speak(f'for example, help code a function to get epoch time in python' or 'help code a sql query to get all rows from a table')
+    if 'help gpt' in said:
+        print('help gpt triggered')
+        speak(f'gpt <text> will generate text using openai gpt-3, you need an api key and this will cost you money')
+        speak(f'for example, gpt what is the meaning of life' or 'gpt what is the best programming language')
+    if 'help google' in said:
+        print('help google triggered')
+        speak(f'google <text> will generate text using google search, this uses a fre open source model, not as good as gpt-3 but free')
+        speak(f'for example, google what is the meaning of life' or 'google what is the best programming language')
+    if 'help make a clip' in said:
+        print('help make a clip triggered')
+        speak(f'make a clip <text> will generate a clip of music using riffusion ')
+        speak(f'for example, make a clip a cat' or 'make a clip a dog')
+    if 'help make a song' in said:
+        print('help make a song triggered')
+        speak(f'make a song <text> will generate a song using riffusion - you have to enter the prompt in the format prompt_1,prompt_2="",steps=25, num_iterations=2, feel="og_beat",seed=0')
+
+    if 'help jam prompt' in said:
+        print('help jam prompt triggered')
+        speak(f'jam prompt will generate a prompt for you to jam with, you need an api key and this will cost you money - but it is less than a cent to get around having to using your own imagination and typing skills')
+
+    if 'help make a jam' in said:
+        print('help make a jam triggered')
+        speak(f'make a jam will generate a song for you to jam with, you need an api key and this will cost you money - this will have gpt3 jam out for you')
+
+    if 'help jam out' in said:
+        print('help jam out triggered')
+        speak(f'jam out will generate a song for you to jam with, you need an api key and this will cost you money, this will have gpt3 jam out for you')
+
+    if 'help get time' in said:
+        print('help get time triggered')
+        speak(f'get time will tell you the time')
+
+    if 'help date' in said:
+        print('help date triggered')
+        speak(f'date will tell you the date')
+
+    if 'help weather' in said:
+        print('help weather triggered')
+        speak(f'weather will tell you the weather')
+
+    if 'help stop recording' in said:
+        print('help stop recording triggered')
+        speak(f'stop recording will stop recording and exit')
+
+    if 'exit' in said or 'stop' in said:
+        print('exit triggered')
+        speak(f'goodbye')
+        exit()
+
+    cmds = ['generate images of', 'generate', 'stable diffuse', 'help code', 'help me', 'get time', 'date', 'weather', 'stop recording', 'gpt', 'google', 'make a clip', 'make a song', 'jam prompt', 'make a jam', 'jam out']
+    if not any(cmd in said for cmd in cmds):
+        print('gpt3 triggered as after thought')
+        text = said
+        more = input('talk,type,google or exit?')
+        if more == 'talk':
+            response = get_text_completion(text)
+            speak(response)
+
+        elif more == 'type':
+            response = get_text_completion(text)
+            print(response)
+        elif more == 'google':
+            response = respond_with_google(text)
+            speak(response)
+            print(response)
+        elif more == 'exit':
+            exit()
 
 def main():
     openaikey = json.load(open('keys.json'))['openai']
     openai.api_key = openaikey
-    print(openai.Model.list())
-
+    #print(openai.Model.list())
     prompt = input('What do you want to do? ')
-    filename_it = 0
     while prompt != 'exit' or prompt != 'stop':
-        said = prompt.lower()
-        if 'get time' in said:
-            print('time triggered')
-            filename_it += 1
-            speak(f'The time is, {time.ctime()}')
-            # convert time to epoch time
-            epoch_time = int(time.time())
-            print(epoch_time)
-            said = 'none'
-
-        if 'date' in said:
-            print('date triggered')
-            filename_it += 1
-            speak(f'Todays date is, {datetime.now().strftime("%d-%m-%Y")}')
-            said = 'None'
-        if 'weather' in said:
-            print('weather triggered')
-            filename_it += 1
-            current_weather = get_current_weather()
-            speak(f' {current_weather}')
-            said = 'none'
-        if 'generate images of' in said:
-            print('image generation triggered')
-            speak(f'Generating 4 images of {said[18:]}')
-            generate_Dalle_images(said[18:])
-            speak(f'Youre image of  {said[18:]}, have been generated')
-            said = 'None'
-        if 'generate' and 'images' in said:
-            print('image generation with number triggered')
-            #find the number which should be between generate and images, split between "generate" and "images"
-            num = said.rsplit("generate").lsplit("images")[0]
-            if num is not int:
-                num = 4
-            pre = len(said.split("images")[0])
-            speak(f'Generating {num} images of {said[pre:]}')
-            generate_Dalle_images(said[pre:], num)
-            speak(f'Youre {said[pre:]}, have been generated')
-            said = 'None'
-        if 'stable diffuse' in said:
-            print('stable diffusion triggered')
-            speak(f'Generating 4 images of {said[15:]}')
-            generate_SD_images(said[15:])
-            speak(f'Youre images of  {said[24:]}, have been generated')
-            said = 'None'
-        if 'help' and 'code' in said:
-            print('help code triggered')
-            pre = len(said.split("code")[0])
-            speak(f'Sure, I can help you with generating code for {said[pre:]}')
-            result = get_code_completion(said[pre:])
-            speak(f'Here is some code for {said[pre:]}')
-            print(result)
-            said = 'None'
-        if 'what' and 'help' in said:
-            print('help triggered')
-            speak(f'You can ask me to generate images, generate code, tell you the time, date, weather, or stop recording')
-            said = 'None'
-        if 'gpt' in said:
-            print('gpt triggered')
-            text = said
-            response = get_text_completion(text)
-            print(response)
-            speak(response)
-            said = 'None'
-        if 'google' in said:
-            print('hey g triggered')
-            said = said.replace('google', '')
-            response = respond_with_google(said)
-            print(response)
-            said = 'None'
-        if 'make a clip' in said or 'generate a clip'in said:
-            print('clip triggered')
-            said = said.replace('make a clip ', '')
-            said = said.replace('play a clip ', '')
-            said = said.replace('with ', '')
-            said = str.strip(said)
-            response = play_a_song(said)
-            print(response)
-            said = 'None'
-        if 'make a song' in said or 'play a song'in said:
-            print('song triggered')
-            prompt = input('prompt_1,prompt_2="",steps=25, num_iterations=2, feel="og_beat",seed=0')
-            args = prompt.split(',')
-            prompt_1 = args[0]
-            prompt_2 = args[1]
-            steps = int(args[2])
-            num_iterations = int(args[3])
-            feel = args[4]
-            seed = int(args[5])
-            response = generate_a_song(prompt_1, prompt_2, steps, num_iterations, feel, seed)
-            print(response)
-            said = 'None'
-        if said.lower() == 'none':
-            prompt = input('What do you want to do? ')
-        else:
-            try:
-                print('gpt3 triggered as after thought')
-                text = said
-                more = input('Do you want to talk?')
-                if more == 'yes':
-                    response = get_text_completion(text)
-                    speak(response)
-                    said = 'none'
-                elif more == 'no':
-                    response = get_text_completion(text)
-                    print(response)
-                    said = 'none'
-                    prompt = input('What do you want to do? ')
-                else:
-                    speak('Ok')
-                    more = input('Do you want to add more text with google?')
-                    if more == 'yes':
-                        response = respond_with_google(text)
-                        print(response)
-                        said = 'none'
-                        prompt = input('What do you want to do? ')
-                    else:
-                        print('Ok')
-                        said = 'none'
-                        prompt = input('What do you want to do? ')
-            except:
-                print('gpt failed')
-                print('local google model triggered')
-                text = said
-                response = respond_with_google(text)
-                print(response)
-                said = 'none'
-                #speak(response)
-
-
+        response = parse_said(prompt)
+        prompt = input('What do you want to do? ')
     else:
-        print(result)
+        print('Ok, bye')
+        exit()
 
 
 main()

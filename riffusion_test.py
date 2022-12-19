@@ -9,6 +9,8 @@ pipe.enable_xformers_memory_efficient_attention()
 
 promptd = "a slow and technical guitar jam with indian tones"  # @param {type: 'string'}
 
+
+
 with torch.autocast("cuda"):
     image = pipe(promptd, height=512, width=512).images[0];
 wav = wav_bytes_from_spectrogram_image(image)
