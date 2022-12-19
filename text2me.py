@@ -204,17 +204,17 @@ def generate_SD_images(text, n=4):
     # params:
     height = 512
     width = 512
-    num_inference_steps = 120
+    num_inference_steps = 95
     guidance_scale = 0.75
     negative_prompt = None
     num_images_per_prompt = 2
     eta = 0.0
-    generator = None
+    #generator = None
     latents = None
     output_type = "pil"
     return_dict = True
     callback = None
-    callback_steps = 0
+    #callback_steps = 0
     timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
 
     for i in range(n):
@@ -223,9 +223,9 @@ def generate_SD_images(text, n=4):
                      #height = height,
                      #width=width,
                      num_inference_steps=num_inference_steps,
-                     guidance_scale=guidance_scale,
+                    # guidance_scale=guidance_scale,
                      #negative_prompt=negative_prompt,
-                     #num_images_per_prompt=num_images_per_prompt,
+                     num_images_per_prompt=num_images_per_prompt,
                      #eta=eta,
                      #generator=generator,
                      #latents=latents,
@@ -580,8 +580,8 @@ def gpt_get_jam_prompt(temp=0.9,top_p=1.0,freq=0,pres=0.0):
         "-" is a separator and the args are separated by it the args should not contain the separator
         prompt1 is a string describing the instruments and feeling at the start of a song, 
         prompt2 is a string describing the instruments and feeling at the end of a song,
-        steps is an int between 25 and 60 and is the number of steps to generate, 
-        num_inf is an int between 2 and 10 and is the number of instruments to generate, 
+        steps is an int between 25 and 60 and is the number of steps to generate. this should usually be between 40 and 60, 
+        num_inf is an int between 2 and 10 and is the number of instruments to generate. this should fluctuate with each request, 
         style is a string from the list of options ['vibes',og_beat,'motorway',marim,'agile','add','boom','shine'] and is the style to use, 
         seed is an int between 0 and 99999 however in most cases 0 should be used just to generate a random seed
 
