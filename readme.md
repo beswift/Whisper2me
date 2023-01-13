@@ -6,7 +6,7 @@ use whisper2me.py to speak  or text2me.py to message your computer directly and 
 - Answers to questions
 - Interesting conversation
 - Text completion
-- Codding answers and examples
+- code answers and examples
 - Image generation
 - Music Generation
 
